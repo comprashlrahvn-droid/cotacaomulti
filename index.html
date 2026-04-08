@@ -377,6 +377,10 @@ canvas{max-width:100%}
       <div class="section-subtitle">Itens cadastrados — ordenados alfabeticamente</div>
     </div>
     <div style="display:flex;gap:10px">
+      <div style="position:relative">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:14px;pointer-events:none">🔍</span>
+        <input type="text" id="search-items" oninput="renderItems()" placeholder="Buscar item..." style="padding:8px 14px 8px 32px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-card);width:220px;font-family:inherit;color:var(--text-primary)">
+      </div>
       <select id="filter-category" onchange="renderItems()" style="padding:8px 14px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-card)">
         <option value="">Todas as categorias</option>
       </select>
@@ -1251,12 +1255,21 @@ function renderItems() {
   cats.innerHTML = '<option value="">Todas as categorias</option>' + CATEGORIES.map(c => '<option value="' + c + '">' + c + '</option>').join('');
   if (prev) cats.value = prev;
   const filter = cats.value;
+  const searchEl = document.getElementById('search-items');
+  const searchTerm = searchEl ? searchEl.value.trim().toLowerCase() : '';
   // Garante ordem antes de renderizar
   sortItems();
-  const items = filter ? state.items.filter(i => i.category === filter) : state.items;
+  let items = filter ? state.items.filter(i => i.category === filter) : state.items;
+  if (searchTerm) {
+    items = items.filter(i =>
+      i.name.toLowerCase().includes(searchTerm) ||
+      i.code.toLowerCase().includes(searchTerm) ||
+      (i.obs && i.obs.toLowerCase().includes(searchTerm))
+    );
+  }
   document.getElementById('badge-items').textContent = state.items.length;
   const tbody = document.getElementById('items-tbody');
-  if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state" style="padding:40px"><h3>Nenhum item</h3></div></td></tr>'; return; }
+  if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state" style="padding:40px"><h3>' + (searchTerm ? 'Nenhum item encontrado para "' + searchTerm + '"' : 'Nenhum item cadastrado') + '</h3></div></td></tr>'; return; }
   tbody.innerHTML = items.map(item => `
     <tr>
       <td><code style="background:var(--bg-input);padding:2px 7px;border-radius:4px;font-family:monospace;font-size:12px">${item.code}</code></td>
@@ -1292,13 +1305,58 @@ function openCotacaoModal(editCotId) {
 
   sortItems();
   const list = document.getElementById('cotacao-items-list');
-  list.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 10px;border-bottom:1px solid var(--border-light);margin-bottom:8px">
-    <span style="font-size:12px;font-weight:600;color:var(--text-muted)">${state.items.length} itens disponíveis (ordem alfabética)</span>
-    <div style="display:flex;gap:8px">
-      <button onclick="toggleAllCotItems(true)" style="font-size:11px;padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer">Marcar todos</button>
-      <button onclick="toggleAllCotItems(false)" style="font-size:11px;padding:4px 10px;background:var(--border);color:var(--text-secondary);border:none;border-radius:6px;cursor:pointer">Desmarcar</button>
+  // Renderiza o cabeçalho de controles + a lista filtrada
+  function renderCotList() {
+    const searchVal = (document.getElementById('cot-search')?.value || '').trim().toLowerCase();
+    const catVal    = document.getElementById('cot-filter-cat')?.value || '';
+    let filtered = state.items;
+    if (catVal) filtered = filtered.filter(i => i.category === catVal);
+    if (searchVal) filtered = filtered.filter(i =>
+      i.name.toLowerCase().includes(searchVal) ||
+      i.code.toLowerCase().includes(searchVal) ||
+      (i.obs && i.obs.toLowerCase().includes(searchVal))
+    );
+    const listBody = document.getElementById('cot-items-body');
+    if (!listBody) return;
+    if (!filtered.length) {
+      listBody.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Nenhum item encontrado</div>';
+      return;
+    }
+    listBody.innerHTML = filtered.map(item => {
+      const existingItem = isEdit ? (editCot.items||[]).find(ci => ci.itemId === item.id) : null;
+      const checked = isEdit ? !!existingItem : false;
+      const qty = existingItem ? existingItem.qty : '';
+      return `
+      <div id="cot-row-${item.id}" style="display:grid;grid-template-columns:auto 1fr 100px 60px;gap:10px;align-items:center;padding:10px 14px;background:var(--bg-input);border-radius:8px;margin-bottom:6px;border:1px solid var(--border)">
+        <input type="checkbox" id="cot-check-${item.id}" style="width:16px;height:16px;accent-color:var(--green)" ${checked ? 'checked' : ''}>
+        <div><div style="font-weight:600;font-size:13px">${item.name}</div><div style="font-size:11px;color:var(--text-muted)">${item.code} · ${item.category}</div></div>
+        <input type="number" id="cot-qty-${item.id}" value="${qty}" placeholder="Qtd" min="0.01" step="0.01" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px">
+        <span style="font-size:12px;color:var(--text-muted)">${item.unit}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const catOptions = CATEGORIES.map(ct => `<option value="${ct}">${ct}</option>`).join('');
+
+  list.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;padding:0 0 12px;border-bottom:1px solid var(--border-light);margin-bottom:10px;flex-wrap:wrap">
+      <div style="position:relative;flex:1;min-width:160px">
+        <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;pointer-events:none">🔍</span>
+        <input type="text" id="cot-search" oninput="renderCotList()" placeholder="Buscar item..." style="padding:7px 12px 7px 30px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;width:100%;font-family:inherit;color:var(--text-primary);background:var(--bg-card)">
+      </div>
+      <select id="cot-filter-cat" onchange="renderCotList()" style="padding:7px 12px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-primary)">
+        <option value="">Todas as categorias</option>
+        ${catOptions}
+      </select>
+      <button onclick="toggleAllCotItems(true)" style="font-size:11px;padding:6px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">✅ Marcar todos</button>
+      <button onclick="toggleAllCotItems(false)" style="font-size:11px;padding:6px 12px;background:var(--border);color:var(--text-secondary);border:none;border-radius:6px;cursor:pointer;white-space:nowrap">☐ Desmarcar</button>
     </div>
-  </div>` + state.items.map(item => {
+    <div id="cot-items-body"></div>`;
+
+  renderCotList();
+
+  // Bloco original substituído — o map abaixo não executa mais
+  const _unused = state.items.map(item => {
     // Em modo edição, pré-preenche com os dados salvos
     const existingItem = isEdit ? (editCot.items||[]).find(ci => ci.itemId === item.id) : null;
     const checked = isEdit ? !!existingItem : true;
@@ -1310,11 +1368,12 @@ function openCotacaoModal(editCotId) {
       <input type="number" id="cot-qty-${item.id}" value="${qty}" placeholder="Qtd" min="0.01" step="0.01" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px">
       <span style="font-size:12px;color:var(--text-muted)">${item.unit}</span>
     </div>`;
-  }).join('');
+  }).join(''); // _unused — lista já renderizada por renderCotList()
   openModal('modal-cotacao');
 }
 
 function toggleAllCotItems(checked) {
+  // Marca apenas os itens atualmente visíveis (filtrados)
   state.items.forEach(item => {
     const cb = document.getElementById('cot-check-' + item.id);
     if (cb) cb.checked = checked;
