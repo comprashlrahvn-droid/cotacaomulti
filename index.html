@@ -1,0 +1,452 @@
+// ============================================================
+//  SISTEMA DE COTAÇÃO — ASSOCIAÇÃO HOSPITALAR VILA NOVA
+//  Google Apps Script — Backend completo
+//
+//  INSTRUÇÕES DE CONFIGURAÇÃO:
+//  1. Crie uma planilha Google Sheets nova
+//  2. Copie o ID da planilha e cole em SHEET_ID abaixo
+//  3. Em Extensions > Apps Script, cole este código
+//  4. Clique em Deploy > New Deployment > Web App
+//     - Execute as: Me
+//     - Who has access: Anyone
+//  5. Copie a URL gerada e cole no HTML do sistema
+//     (variável APPS_SCRIPT_URL)
+//  IMPORTANTE: Ao atualizar o código, sempre use
+//  "Edit deployment" (não crie um novo deployment),
+//  assim a URL permanece a mesma.
+// ============================================================
+
+// ── CONFIGURAÇÃO ────────────────────────────────────────────
+const SHEET_ID = '1TlhUlWy4j0T4n0KGj-FvU57ghwBgxTJpgV08j0l7OW8';
+
+// E-mail do administrador master (deve ser igual ao do HTML)
+const MASTER_EMAIL = 'golfettojunior1@gmail.com';
+
+// Nomes das abas da planilha (criadas automaticamente)
+const TABS = {
+  cotacoes:  'cotacoes',
+  respostas: 'respostas',
+  usuarios:  'usuarios',
+};
+
+// ── ROTEADOR PRINCIPAL ───────────────────────────────────────
+
+function doGet(e) {
+  return handleRequest(e);
+}
+
+function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
+  try {
+    let action, data;
+
+    // Suporte a GET e POST
+    if (e.postData && e.postData.contents) {
+      const body = JSON.parse(e.postData.contents);
+      action = body.action;
+      data   = body.data || {};
+    } else {
+      action = e.parameter.action;
+      data   = e.parameter.data ? JSON.parse(decodeURIComponent(e.parameter.data)) : {};
+    }
+
+    let result;
+
+    switch (action) {
+
+      // ── COTAÇÕES ──
+      case 'saveCotacao':      result = saveCotacao(data);      break;
+      case 'getCotacoes':      result = getCotacoes();          break;
+
+      // ── RESPOSTAS DE FORNECEDORES ──
+      case 'saveResposta':     result = saveResposta(data);     break;
+      case 'getRespostas':     result = getRespostas(data);     break;
+      case 'getAllRespostas':   result = getAllRespostas();      break;
+
+      // ── USUÁRIOS ──
+      case 'loginUser':        result = loginUser(data);        break;
+      case 'registerUser':     result = registerUser(data);     break;
+      case 'getUsuarios':      result = getUsuarios(data);      break;
+      case 'updateUsuarioStatus': result = updateUsuarioStatus(data); break;
+
+      default:
+        result = { status: 'error', message: 'Ação desconhecida: ' + action };
+    }
+
+    return jsonResponse(result);
+
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err.message });
+  }
+}
+
+// ── UTILITÁRIOS ──────────────────────────────────────────────
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getSheet(tabName) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(tabName);
+  if (!sheet) {
+    sheet = ss.insertSheet(tabName);
+    initTab(sheet, tabName);
+  }
+  return sheet;
+}
+
+// Cria cabeçalhos automaticamente quando a aba é criada pela primeira vez
+function initTab(sheet, tabName) {
+  const headers = {
+    cotacoes:  [['id','title','deadline','items_json','createdAt','status']],
+    respostas: [['id','cotacaoId','cotacaoTitle','cnpj','razaoSocial','contato','submittedAt','prices_json']],
+    usuarios:  [['id','nome','email','senha_hash','status','criadoPor','criadoEm']],
+  };
+  if (headers[tabName]) {
+    sheet.getRange(1, 1, 1, headers[tabName][0].length).setValues(headers[tabName]);
+    sheet.getRange(1, 1, 1, headers[tabName][0].length)
+      .setBackground('#1a3a25')
+      .setFontColor('#ffffff')
+      .setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+}
+
+// Hash simples (SHA-256 via Utilities) para senhas
+function hashSenha(senha) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    senha,
+    Utilities.Charset.UTF_8
+  );
+  return bytes.map(b => ('0' + (b & 0xff).toString(16)).slice(-2)).join('');
+}
+
+// ── COTAÇÕES ────────────────────────────────────────────────
+
+/**
+ * Salva ou atualiza uma cotação.
+ * Dados esperados: { id, title, deadline, items, createdAt, status }
+ * A lista de itens (array) é armazenada como JSON na coluna items_json.
+ */
+function saveCotacao(data) {
+  const sheet = getSheet(TABS.cotacoes);
+  const rows  = sheet.getDataRange().getValues();
+  const itemsJson = JSON.stringify(data.items || []);
+
+  // Procura linha existente pelo id
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      // Atualiza linha existente
+      sheet.getRange(i + 1, 1, 1, 6).setValues([[
+        data.id,
+        data.title,
+        data.deadline || '',
+        itemsJson,
+        data.createdAt || new Date().toISOString(),
+        data.status || 'aberta'
+      ]]);
+      return { status: 'ok', updated: true };
+    }
+  }
+
+  // Insere nova linha
+  sheet.appendRow([
+    data.id,
+    data.title,
+    data.deadline || '',
+    itemsJson,
+    data.createdAt || new Date().toISOString(),
+    data.status || 'aberta'
+  ]);
+  return { status: 'ok', created: true };
+}
+
+/**
+ * Retorna todas as cotações.
+ * Acessível a todos os usuários autenticados.
+ */
+function getCotacoes() {
+  const sheet = getSheet(TABS.cotacoes);
+  const rows  = sheet.getDataRange().getValues();
+  const cotacoes = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue; // linha vazia
+    cotacoes.push({
+      id:        Number(row[0]),
+      title:     row[1],
+      deadline:  row[2],
+      items:     safeParseJSON(row[3], []),
+      createdAt: row[4],
+      status:    row[5] || 'aberta'
+    });
+  }
+  return { status: 'ok', cotacoes };
+}
+
+// ── RESPOSTAS DE FORNECEDORES ────────────────────────────────
+
+/**
+ * Salva ou atualiza uma resposta de fornecedor.
+ * Dados esperados: { cotacaoId, cotacaoTitle, cnpj, razaoSocial,
+ *                    contato, submittedAt, prices }
+ * Chave de deduplicação: cotacaoId + CNPJ (digits only).
+ * Acessível sem login (fornecedores externos usam o link público).
+ */
+function saveResposta(data) {
+  const sheet  = getSheet(TABS.respostas);
+  const rows   = sheet.getDataRange().getValues();
+  const cnpjDigits = String(data.cnpj || '').replace(/\D/g, '');
+  const pricesJson = JSON.stringify(data.prices || []);
+  const now    = new Date().toISOString();
+  const respId = data.id || Date.now();
+
+  // Procura resposta existente (mesmo cotacaoId + mesmo CNPJ)
+  for (let i = 1; i < rows.length; i++) {
+    const rowCnpjDigits = String(rows[i][3] || '').replace(/\D/g, '');
+    if (String(rows[i][1]) === String(data.cotacaoId) &&
+        rowCnpjDigits === cnpjDigits) {
+      // Atualiza linha existente
+      sheet.getRange(i + 1, 1, 1, 8).setValues([[
+        rows[i][0],           // mantém id original
+        data.cotacaoId,
+        data.cotacaoTitle || '',
+        data.cnpj,
+        data.razaoSocial,
+        data.contato || '',
+        data.submittedAt || now,
+        pricesJson
+      ]]);
+      return { status: 'ok', updated: true, id: rows[i][0] };
+    }
+  }
+
+  // Insere nova resposta
+  sheet.appendRow([
+    respId,
+    data.cotacaoId,
+    data.cotacaoTitle || '',
+    data.cnpj,
+    data.razaoSocial,
+    data.contato || '',
+    data.submittedAt || now,
+    pricesJson
+  ]);
+  return { status: 'ok', created: true, id: respId };
+}
+
+/**
+ * Retorna respostas de uma cotação específica.
+ * Dados esperados: { cotacaoId }
+ * Acessível a todos os usuários autenticados.
+ */
+function getRespostas(data) {
+  const sheet = getSheet(TABS.respostas);
+  const rows  = sheet.getDataRange().getValues();
+  const respostas = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue;
+    if (data.cotacaoId && String(row[1]) !== String(data.cotacaoId)) continue;
+    respostas.push(parseRespostaRow(row));
+  }
+  return { status: 'ok', respostas };
+}
+
+/**
+ * Retorna todas as respostas de todas as cotações.
+ * Acessível a todos os usuários autenticados.
+ */
+function getAllRespostas() {
+  const sheet = getSheet(TABS.respostas);
+  const rows  = sheet.getDataRange().getValues();
+  const respostas = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue;
+    respostas.push(parseRespostaRow(row));
+  }
+  return { status: 'ok', respostas };
+}
+
+function parseRespostaRow(row) {
+  return {
+    id:            row[0],
+    cotacaoId:     Number(row[1]),
+    cotacaoTitle:  row[2],
+    cnpj:          row[3],
+    razaoSocial:   row[4],
+    contato:       row[5],
+    submittedAt:   row[6],
+    prices:        safeParseJSON(row[7], [])
+  };
+}
+
+// ── USUÁRIOS ─────────────────────────────────────────────────
+
+/**
+ * Autentica um usuário.
+ * Dados esperados: { email, senha }
+ *
+ * REGRA DE PRIVACIDADE:
+ * - Retorna apenas dados não sensíveis: id, nome, email, status, isMaster
+ * - NUNCA retorna senha_hash
+ */
+function loginUser(data) {
+  const sheet = getSheet(TABS.usuarios);
+  const rows  = sheet.getDataRange().getValues();
+  const email = String(data.email || '').toLowerCase().trim();
+  const hash  = hashSenha(data.senha || '');
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rowEmail = String(row[2] || '').toLowerCase().trim();
+
+    if (rowEmail === email) {
+      if (String(row[3]) !== hash) {
+        return { status: 'error', message: 'Senha incorreta.' };
+      }
+      if (row[4] === 'pendente') {
+        return { status: 'error', message: 'Acesso pendente de aprovação pelo administrador.' };
+      }
+      if (row[4] === 'inativo') {
+        return { status: 'error', message: 'Usuário inativo. Contate o administrador.' };
+      }
+      // Retorna apenas dados não sensíveis
+      return {
+        status: 'ok',
+        user: {
+          id:       row[0],
+          nome:     row[1],
+          email:    row[2],
+          status:   row[4],
+          isMaster: rowEmail === MASTER_EMAIL.toLowerCase()
+        }
+      };
+    }
+  }
+  return { status: 'error', message: 'Usuário não encontrado.' };
+}
+
+/**
+ * Cadastra um novo usuário.
+ * Dados esperados: { nome, email, senha, criadoPor, status? }
+ *
+ * REGRA DE PRIVACIDADE:
+ * - A senha é armazenada apenas como hash SHA-256
+ * - Nunca a senha em texto puro é gravada
+ * - status padrão: 'pendente' (aguarda aprovação do master)
+ * - Se criadoPor === MASTER_EMAIL, pode setar status diretamente
+ */
+function registerUser(data) {
+  const sheet = getSheet(TABS.usuarios);
+  const rows  = sheet.getDataRange().getValues();
+  const email = String(data.email || '').toLowerCase().trim();
+
+  // Verifica duplicidade
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][2] || '').toLowerCase().trim() === email) {
+      return { status: 'error', message: 'E-mail já cadastrado.' };
+    }
+  }
+
+  const isMasterCreating = String(data.criadoPor || '').toLowerCase().trim() === MASTER_EMAIL.toLowerCase();
+  // Master pode criar usuário já ativo; auto-cadastro sempre fica pendente
+  const status = isMasterCreating ? (data.status || 'ativo') : 'pendente';
+  const id     = Date.now();
+  const hash   = hashSenha(data.senha || '');
+
+  sheet.appendRow([
+    id,
+    data.nome,
+    email,
+    hash,            // senha armazenada como hash — NUNCA texto puro
+    status,
+    data.criadoPor || 'auto-cadastro',
+    new Date().toISOString()
+  ]);
+
+  return { status: 'ok', id, userStatus: status };
+}
+
+/**
+ * Retorna lista de usuários.
+ *
+ * REGRA DE PRIVACIDADE:
+ * - NUNCA retorna senha_hash independente de quem perguntar
+ * - Retorna: id, nome, email, status, criadoPor, criadoEm
+ * - A filtragem de quem pode VER a lista é feita no frontend
+ *   (apenas admin master acessa a aba Usuários)
+ */
+function getUsuarios() {
+  const sheet = getSheet(TABS.usuarios);
+  const rows  = sheet.getDataRange().getValues();
+  const usuarios = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue;
+    // Coluna 3 (índice 3) = senha_hash — OMITIDA intencionalmente
+    usuarios.push({
+      id:        row[0],
+      nome:      row[1],
+      email:     row[2],
+      // row[3] = senha_hash — NÃO incluída
+      status:    row[4],
+      criadoPor: row[5],
+      criadoEm:  row[6]
+    });
+  }
+  return { status: 'ok', usuarios };
+}
+
+/**
+ * Atualiza status de um usuário (ativo / inativo / pendente).
+ * Dados esperados: { id, status }
+ *
+ * REGRA DE PRIVACIDADE:
+ * - Só altera a coluna status
+ * - Nunca toca na coluna senha_hash
+ */
+function updateUsuarioStatus(data) {
+  const sheet = getSheet(TABS.usuarios);
+  const rows  = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      sheet.getRange(i + 1, 5).setValue(data.status); // coluna 5 = status
+      return { status: 'ok' };
+    }
+  }
+  return { status: 'error', message: 'Usuário não encontrado.' };
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+
+function safeParseJSON(str, fallback) {
+  try { return JSON.parse(str); }
+  catch(e) { return fallback; }
+}
+
+// ── SETUP INICIAL (execute uma vez manualmente) ───────────────
+
+/**
+ * Execute esta função UMA VEZ pelo editor do Apps Script
+ * para criar todas as abas e cabeçalhos automaticamente.
+ * Depois disso não é necessário executá-la novamente.
+ */
+function setupPlanilha() {
+  Object.values(TABS).forEach(tab => getSheet(tab));
+  Logger.log('✅ Planilha configurada com sucesso!');
+  Logger.log('Abas criadas: ' + Object.values(TABS).join(', '));
+}
