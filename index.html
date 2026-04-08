@@ -560,6 +560,27 @@ canvas{max-width:100%}
   </div>
 </div>
 
+<!-- MODAL: CATEGORIA -->
+<div class="modal-overlay" id="modal-categoria">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-cat-title">Nova Categoria</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-categoria')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cat-edit-index">
+      <div class="form-group">
+        <label>Nome da Categoria *</label>
+        <input type="text" id="cat-name" placeholder="Ex: Instrumentais Cirúrgicos">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-categoria')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCategoria()">✓ Salvar Categoria</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: COTAÇÃO -->
 <div class="modal-overlay" id="modal-cotacao">
   <div class="modal" style="max-width:750px">
@@ -1154,6 +1175,9 @@ function deleteCategoria(idx) {
 // ══ ITEMS ══
 function openItemModal(editId = null) {
   document.getElementById('item-edit-id').value = editId || '';
+  // Popula o select de categorias sempre que o modal abre
+  const catSel = document.getElementById('item-category');
+  catSel.innerHTML = CATEGORIES.map(ct => '<option value="' + ct + '">' + ct + '</option>').join('');
   if (editId) {
     const item = state.items.find(i => i.id === editId); if (!item) return;
     document.getElementById('item-code').value = item.code;
