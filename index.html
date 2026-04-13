@@ -2129,7 +2129,7 @@ function downloadOC(respId, cotId) {
       const descExtra = (i._redirected?' [Redirecionado]':'') + (hasConv?' [Conv: '+i.offerQtyPerUnit+i.offerUnit+'/'+i.unit+']':'');
       return [i.code, i.name+descExtra, i.qty.toString(), i.unit, 'R$ '+i.unitPrice.toFixed(4), 'R$ '+i.total.toFixed(2)];
     }),
-    foot:[['','','','','','TOTAL GERAL','R$ '+grandTotal.toFixed(2)]],
+    foot:[['','','','','TOTAL GERAL','R$ '+grandTotal.toFixed(2)]],
     headStyles:{fillColor:[26,92,58],textColor:255,fontStyle:'bold',fontSize:8.5},
     footStyles:{fillColor:[200,16,46],textColor:255,fontStyle:'bold',fontSize:10},
     bodyStyles:{fontSize:8},alternateRowStyles:{fillColor:[240,250,244]},
