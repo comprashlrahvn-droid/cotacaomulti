@@ -979,12 +979,45 @@ function loadLocalState() {
     state.items = JSON.parse(JSON.stringify(SEED_ITEMS));
     state.nextItemId = SEED_NEXT_ID;
   }
-  sortItems(); // garante ordem ao carregar
+  sortItems();
 }
 
 function saveLocalState() {
-  sortItems(); // garante ordem ao salvar
+  sortItems();
   localStorage.setItem('vn-cotacao-geral-v1', JSON.stringify({ items: state.items, nextItemId: state.nextItemId }));
+}
+
+// Salva itens e categorias no servidor (compartilhado entre usuários)
+async function saveSharedItems() {
+  saveLocalState(); // sempre salva local também
+  try {
+    await apiCall('saveSharedData', {
+      items: state.items,
+      nextItemId: state.nextItemId,
+      categories: CATEGORIES
+    });
+  } catch(e) {
+    // silencioso — dados locais já foram salvos
+  }
+}
+
+// Carrega itens e categorias do servidor (dados compartilhados)
+async function loadSharedItems() {
+  try {
+    const res = await apiCall('getSharedData', {});
+    if (res.status === 'ok' && res.items && res.items.length) {
+      state.items = res.items;
+      state.nextItemId = res.nextItemId || SEED_NEXT_ID;
+      if (res.categories && res.categories.length) {
+        CATEGORIES.length = 0;
+        res.categories.forEach(c => CATEGORIES.push(c));
+        localStorage.setItem('vn-cotacao-geral-cats-v1', JSON.stringify(CATEGORIES));
+      }
+      saveLocalState();
+      return true;
+    }
+  } catch(e) {}
+  return false;
 }
 
 // ══ API ══
@@ -1134,12 +1167,12 @@ function saveCategoria() {
     CATEGORIES[idx] = name;
     // Update items with old category name
     state.items.forEach(item => { if (item.category === oldName) item.category = name; });
-    saveLocalState();
   } else {
     if (CATEGORIES.includes(name)) { toast('Essa categoria já existe', 'error'); return; }
     CATEGORIES.push(name);
   }
-  saveCategories();
+  localStorage.setItem('vn-cotacao-geral-cats-v1', JSON.stringify(CATEGORIES));
+  saveSharedItems();
   closeModal('modal-categoria');
   renderCategorias();
   renderItems();
@@ -1163,10 +1196,10 @@ function deleteCategoria(idx) {
   if (count > 0) {
     state.items.forEach(item => { if (item.category === cat) item.category = 'Outros'; });
     if (!CATEGORIES.includes('Outros')) CATEGORIES.push('Outros');
-    saveLocalState();
   }
   CATEGORIES.splice(idx, 1);
-  saveCategories();
+  localStorage.setItem('vn-cotacao-geral-cats-v1', JSON.stringify(CATEGORIES));
+  saveSharedItems();
   renderCategorias();
   renderItems();
   toast('Categoria excluída!');
@@ -1221,13 +1254,13 @@ function saveItem() {
     toast('Item cadastrado!');
   }
   // Reordena sempre após salvar
-  saveLocalState(); renderItems(); updateBadges(); closeModal('modal-item');
+  saveSharedItems(); renderItems(); updateBadges(); closeModal('modal-item');
 }
 
 function deleteItem(id) {
   if (!confirm('Excluir este item?')) return;
   state.items = state.items.filter(i => i.id !== id);
-  saveLocalState(); renderItems(); updateBadges(); toast('Item removido', 'info');
+  saveSharedItems(); renderItems(); updateBadges(); toast('Item removido', 'info');
 }
 
 function restoreSeedItems() {
@@ -1235,7 +1268,7 @@ function restoreSeedItems() {
   const custom = state.items.filter(i => i.id >= SEED_NEXT_ID);
   state.items = [...JSON.parse(JSON.stringify(SEED_ITEMS)), ...custom];
   state.nextItemId = Math.max(SEED_NEXT_ID, ...state.items.map(i => i.id)) + 1;
-  saveLocalState(); renderItems(); updateBadges(); toast('Lista padrão restaurada!');
+  saveSharedItems(); renderItems(); updateBadges(); toast('Lista padrão restaurada!');
 }
 
 // ══ CATEGORIAS (gerenciáveis) ══
@@ -2066,6 +2099,12 @@ function downloadCompletoPDF() {
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.text('ORDEM DE COMPRA',14,44);
     doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text('No: '+ocId,165,16); doc.text('Data: '+today,165,22);
     doc.setFillColor(200,16,46); doc.rect(0,52,210,3,'F');
+    doc.setFillColor(240,253,244); doc.rect(10,59,90,30,'F');
+    doc.setDrawColor(26,92,58); doc.setLineWidth(0.4); doc.rect(10,59,90,30);
+    doc.setTextColor(26,92,58); doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.text('EMITENTE',14,65);
+    doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    doc.text('Assoc. Hospitalar Vila Nova',14,71); doc.text('CNPJ: 04.994.418/0009-70',14,77);
+    doc.text('Rua Osvaldo Cruz, 116 - Campo Bom',14,82);
     doc.setFillColor(255,245,245); doc.rect(105,59,95,30,'F');
     doc.setDrawColor(200,16,46); doc.setLineWidth(0.4); doc.rect(105,59,95,30);
     doc.setTextColor(200,16,46); doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.text('FORNECEDOR',109,65);
@@ -2073,10 +2112,10 @@ function downloadCompletoPDF() {
     doc.text(resp.razaoSocial.substring(0,40),109,71); doc.text('CNPJ: '+resp.cnpj,109,77); doc.text('Cotacao: '+cot.title,109,82);
     doc.autoTable({startY:95,head:[['Codigo','Descricao','Qtd','Unid.','Preco Unit.','Total (R$)']],body:items.map(i=>[i.code,i.name,i.qty.toString(),i.unit,'R$ '+i.unitPrice.toFixed(2),'R$ '+i.total.toFixed(2)]),foot:[['','','','','TOTAL GERAL','R$ '+grandTotal.toFixed(2)]],headStyles:{fillColor:[26,92,58],textColor:255,fontStyle:'bold',fontSize:8.5},footStyles:{fillColor:[200,16,46],textColor:255,fontStyle:'bold',fontSize:10},bodyStyles:{fontSize:8.5},alternateRowStyles:{fillColor:[240,250,244]},columnStyles:{0:{cellWidth:22},1:{cellWidth:80},2:{cellWidth:12,halign:'center'},3:{cellWidth:12,halign:'center'},4:{cellWidth:30,halign:'right'},5:{cellWidth:30,halign:'right',fontStyle:'bold'}},margin:{left:10,right:10}});
     const fy=doc.lastAutoTable.finalY;
-    doc.setFillColor(255,251,235); doc.setDrawColor(180,130,0); doc.rect(10,fy+8,190,18,'FD');
+    doc.setFillColor(255,251,235); doc.setDrawColor(180,130,0); doc.rect(10,fy+8,190,24,'FD');
     doc.setTextColor(60,40,0); doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.text('ENTREGA DE MERCADORIAS DE SEGUNDA A SEXTA DAS 07:30H AS 11:00H',14,fy+14);
-    doc.text('FUNDOS DO HOSPITAL, SETOR DE NUTRICAO.',14,fy+20);
+    doc.text('ENTREGA DE MERCADORIAS DE SEGUNDA A SEXTA DAS 08:15H AS 11:30H e das 13:15H as 16:00H',14,fy+15);
+    doc.text('FUNDOS DO HOSPITAL SETOR DE SUPRIMENTOS.',14,fy+23);
     const sigY=fy+36;
     doc.setDrawColor(160,160,160); doc.line(14,sigY,84,sigY); doc.line(126,sigY,196,sigY);
     doc.setFontSize(8); doc.setTextColor(100,100,100);
@@ -2136,10 +2175,10 @@ function downloadOC(respId, cotId) {
     columnStyles:{0:{cellWidth:22},1:{cellWidth:80},2:{cellWidth:12,halign:'center'},3:{cellWidth:12,halign:'center'},4:{cellWidth:30,halign:'right'},5:{cellWidth:30,halign:'right',fontStyle:'bold'}},
     margin:{left:10,right:10}});
   const fy=doc.lastAutoTable.finalY;
-  doc.setFillColor(255,251,235); doc.setDrawColor(180,130,0); doc.rect(10,fy+8,190,18,'FD');
+  doc.setFillColor(255,251,235); doc.setDrawColor(180,130,0); doc.rect(10,fy+8,190,24,'FD');
   doc.setTextColor(60,40,0); doc.setFontSize(8); doc.setFont('helvetica','normal');
-  doc.text('ENTREGA DE MERCADORIAS DE SEGUNDA A SEXTA DAS 07:30H AS 11:00H',14,fy+14);
-  doc.text('FUNDOS DO HOSPITAL, SETOR DE NUTRICAO.',14,fy+20);
+  doc.text('ENTREGA DE MERCADORIAS DE SEGUNDA A SEXTA DAS 08:15H AS 11:30H e das 13:15H as 16:00H',14,fy+15);
+  doc.text('FUNDOS DO HOSPITAL SETOR DE SUPRIMENTOS.',14,fy+23);
   const sigY=fy+36;
   doc.setDrawColor(160,160,160); doc.line(14,sigY,84,sigY); doc.line(126,sigY,196,sigY);
   doc.setFontSize(8); doc.setTextColor(100,100,100);
@@ -2350,12 +2389,23 @@ async function initApp() {
   renderItems();
   updateBadges();
   try {
+    // Carrega itens compartilhados do servidor antes de sincronizar
+    const sharedLoaded = await loadSharedItems();
+    if (sharedLoaded) {
+      renderItems();
+      updateBadges();
+    }
     await syncAll();
   } catch(e) {
     setSyncStatus('error', 'Sem conexão');
   }
   document.getElementById('global-loading').style.display = 'none';
   setInterval(syncAll, 60000);
+  // Recarrega itens compartilhados a cada 60s para manter sincronizado
+  setInterval(async () => {
+    const ok = await loadSharedItems();
+    if (ok) { renderItems(); updateBadges(); }
+  }, 60000);
 }
 
 init();
