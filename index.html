@@ -621,11 +621,20 @@ canvas{max-width:100%}
       <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--green)">
         ⚠️ CNPJ e Razão Social são obrigatórios. Preencha os preços unitários dos itens disponíveis.
       </div>
-      <div class="form-grid" style="margin-bottom:20px">
+      <div class="form-grid" style="margin-bottom:12px">
         <div class="form-group"><label>CNPJ *</label><input type="text" id="sf-cnpj" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)"></div>
         <div class="form-group"><label>Razão Social *</label><input type="text" id="sf-razao" placeholder="Nome da empresa"></div>
         <div class="form-group full"><label>Contato (Nome/E-mail/Telefone)</label><input type="text" id="sf-contato" placeholder="Opcional"></div>
-        <div class="form-group full"><label>Condição de Pagamento</label><input type="text" id="sf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias..."></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;background:rgba(34,197,94,.07);border:1.5px solid rgba(34,197,94,.3);border-radius:10px;padding:14px 16px">
+        <div class="form-group">
+          <label style="color:var(--green);font-weight:700">💳 Condição de Pagamento</label>
+          <input type="text" id="sf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias...">
+        </div>
+        <div class="form-group">
+          <label style="color:var(--green);font-weight:700">🚚 Prazo de Entrega</label>
+          <input type="text" id="sf-prazo" placeholder="Ex: 5 dias úteis, Imediato, 10 dias...">
+        </div>
       </div>
       <div id="sf-items-list"></div>
     </div>
@@ -1531,6 +1540,7 @@ function openSupplierForm(cotId) {
   document.getElementById('sf-razao').value = '';
   document.getElementById('sf-contato').value = '';
   document.getElementById('sf-pagamento').value = '';
+  document.getElementById('sf-prazo').value = '';
   document.getElementById('sf-items-list').innerHTML = (cot.items||[]).map(item => `
     <div style="padding:14px;background:var(--bg-input);border-radius:8px;margin-bottom:8px;border:1px solid var(--border)">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start">
@@ -1564,7 +1574,7 @@ async function submitSupplierForm() {
     disponivel: document.getElementById('sf-disp-'+item.itemId)?.value === 'sim',
     comment: document.getElementById('sf-comment-'+item.itemId)?.value || ''
   }));
-  const payload = { cotacaoId: cotId, cotacaoTitle: cot.title, cnpj, razaoSocial: razao, contato: document.getElementById('sf-contato').value||'', condicaoPagamento: document.getElementById('sf-pagamento')?.value||'', submittedAt: new Date().toISOString(), prices };
+  const payload = { cotacaoId: cotId, cotacaoTitle: cot.title, cnpj, razaoSocial: razao, contato: document.getElementById('sf-contato').value||'', condicaoPagamento: document.getElementById('sf-pagamento')?.value||'', prazoEntrega: document.getElementById('sf-prazo')?.value||'', submittedAt: new Date().toISOString(), prices };
   const btn = document.getElementById('sf-submit-btn');
   btn.disabled = true; btn.textContent = 'Enviando...';
   const res = await apiCall('saveResposta', payload);
@@ -1621,7 +1631,7 @@ function renderRespostas() {
       <div class="card-header">
         <div>
           <div class="card-title">${resp.razaoSocial}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${resp.cnpj} · ${cot?.title||'Cotação #'+resp.cotacaoId} · ${new Date(resp.submittedAt).toLocaleString('pt-BR')}${resp.condicaoPagamento?'<br><span style="color:var(--text-secondary)">💳 Cond. Pgto: <strong>'+resp.condicaoPagamento+'</strong></span>':''}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${resp.cnpj} · ${cot?.title||'Cotação #'+resp.cotacaoId} · ${new Date(resp.submittedAt).toLocaleString('pt-BR')}${(resp.condicaoPagamento||resp.prazoEntrega)?`<br><span style="color:var(--text-secondary)">${resp.condicaoPagamento?'💳 '+resp.condicaoPagamento:''}${resp.condicaoPagamento&&resp.prazoEntrega?' &nbsp;·&nbsp; ':''}${resp.prazoEntrega?'🚚 '+resp.prazoEntrega:''}</span>`:''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <span class="badge badge-green">Total: R$ ${total.toFixed(2).replace('.',',')}</span>
@@ -1681,10 +1691,14 @@ function openEditResposta(respId) {
   document.getElementById('er-resp-id').value = respId;
   document.getElementById('er-header-info').innerHTML =
     `<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
-      <div><strong>${resp.razaoSocial}</strong> &nbsp;·&nbsp; CNPJ: ${resp.cnpj} &nbsp;·&nbsp; Contato: ${resp.contato||'—'}</div>
-      <div style="flex:1;min-width:260px">
-        <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">💳 Condição de Pagamento</label>
+      <div style="flex:2;min-width:200px"><strong>${resp.razaoSocial}</strong> &nbsp;·&nbsp; CNPJ: ${resp.cnpj} &nbsp;·&nbsp; Contato: ${resp.contato||'—'}</div>
+      <div style="flex:1;min-width:220px">
+        <label style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">💳 Condição de Pagamento</label>
         <input type="text" id="er-pagamento" value="${resp.condicaoPagamento||''}" placeholder="Ex: 30 dias, À vista, 30/60/90 dias..." style="padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;width:100%;font-family:Inter,sans-serif;outline:none">
+      </div>
+      <div style="flex:1;min-width:220px">
+        <label style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">🚚 Prazo de Entrega</label>
+        <input type="text" id="er-prazo" value="${resp.prazoEntrega||''}" placeholder="Ex: 5 dias úteis, Imediato..." style="padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;width:100%;font-family:Inter,sans-serif;outline:none">
       </div>
     </div>`;
 
@@ -1784,6 +1798,7 @@ async function saveEditResposta() {
 
   const cot = state.cotacoes.find(c => c.id === resp.cotacaoId);
   resp.condicaoPagamento = document.getElementById('er-pagamento')?.value || '';
+  resp.prazoEntrega = document.getElementById('er-prazo')?.value || '';
   let qtyChanged = false;
 
   resp.prices = (resp.prices||[]).map(p => {
@@ -2089,17 +2104,18 @@ function downloadCompletoPDF() {
   let cx = 10, cy = 58;
   const condBoxW = Math.floor(270 / Math.min(resps.length, 4));
   resps.forEach((r, i) => {
-    if (i > 0 && i % 4 === 0) { cx = 10; cy += 14; }
-    doc.setFillColor(240,252,244); doc.rect(cx, cy-5, condBoxW-3, 12, 'F');
-    doc.setDrawColor(26,92,58); doc.setLineWidth(0.3); doc.rect(cx, cy-5, condBoxW-3, 12);
+    if (i > 0 && i % 4 === 0) { cx = 10; cy += 18; }
+    doc.setFillColor(240,252,244); doc.rect(cx, cy-5, condBoxW-3, 16, 'F');
+    doc.setDrawColor(26,92,58); doc.setLineWidth(0.3); doc.rect(cx, cy-5, condBoxW-3, 16);
     doc.setTextColor(26,92,58); doc.setFontSize(7); doc.setFont('helvetica','bold');
     doc.text((r.razaoSocial||'').substring(0,condBoxW/2.2), cx+2, cy);
-    doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-    doc.text((r.condicaoPagamento||'Nao informada').substring(0,condBoxW/1.8), cx+2, cy+5);
+    doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.text('Pgto: '+(r.condicaoPagamento||'N/I').substring(0,condBoxW/2.1), cx+2, cy+5);
+    doc.text('Prazo: '+(r.prazoEntrega||'N/I').substring(0,condBoxW/2.3), cx+2, cy+10);
     cx += condBoxW;
   });
 
-  const tableStartY = cy + 14;
+  const tableStartY = cy + 18;
 
   // ── TABELA COMPARATIVA ──
   doc.setTextColor(26,92,58); doc.setFontSize(12); doc.setFont('helvetica','bold');
@@ -2169,7 +2185,9 @@ function downloadCompletoPDF() {
     const grandTotal = items.reduce((s,i) => s+i.total, 0);
     const ocId = 'OC-'+cotId+'-'+resp.id+'-'+yyyy;
     const hasCond = resp.condicaoPagamento && resp.condicaoPagamento.trim();
-    const headerH = hasCond ? 57 : 52;
+    const hasPrazo = resp.prazoEntrega && resp.prazoEntrega.trim();
+    const hasInfo = hasCond || hasPrazo;
+    const headerH = hasInfo ? 57 : 52;
 
     doc.setFillColor(26,92,58); doc.rect(0,0,210,headerH,'F');
     doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont('helvetica','bold');
@@ -2200,18 +2218,17 @@ function downloadCompletoPDF() {
     doc.text('Cotacao: '+cot.title,109,boxY+24);
 
     // Condição de pagamento em destaque
-    if (hasCond) {
-      const condY = boxY + 35;
+    const condY = boxY + 35;
+    if (hasInfo) {
       doc.setFillColor(255,251,225); doc.setDrawColor(180,130,0); doc.rect(10,condY,190,10,'FD');
       doc.setTextColor(80,50,0); doc.setFontSize(8); doc.setFont('helvetica','bold');
-      doc.text('\u{1F4B3} Cond. de Pagamento:  ',14,condY+6.5);
-      doc.setFont('helvetica','normal');
-      const labelW = doc.getTextWidth('\u{1F4B3} Cond. de Pagamento:  ');
-      doc.setTextColor(26,92,58); doc.setFont('helvetica','bold');
-      doc.text(resp.condicaoPagamento.substring(0,60),14+labelW,condY+6.5);
+      const parts = [];
+      if (hasCond) parts.push('Pgto: '+resp.condicaoPagamento);
+      if (hasPrazo) parts.push('Prazo: '+resp.prazoEntrega);
+      doc.text(parts.join('   |   ').substring(0,90), 14, condY+6.5);
     }
 
-    const tableY = boxY + (hasCond ? 50 : 38);
+    const tableY = boxY + (hasInfo ? 50 : 38);
     doc.autoTable({
       startY: tableY,
       head:[['Codigo','Descricao','Qtd','Unid.','Preco Unit.','Total (R$)']],
@@ -2280,15 +2297,17 @@ function downloadOC(respId, cotId) {
   doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
   doc.text(resp.razaoSocial.substring(0,40),109,71); doc.text('CNPJ: '+resp.cnpj,109,77);
   doc.text('Cotacao: '+cot.title,109,82); if(resp.contato)doc.text('Contato: '+resp.contato,109,87);
-  // Condição de pagamento em destaque
+  // Condição de pagamento e prazo de entrega em destaque
   const hasCond = resp.condicaoPagamento && resp.condicaoPagamento.trim();
-  const tableStartY = hasCond ? 100 : 95;
-  if (hasCond) {
+  const hasPrazo2 = resp.prazoEntrega && resp.prazoEntrega.trim();
+  const tableStartY = (hasCond||hasPrazo2) ? 100 : 95;
+  if (hasCond || hasPrazo2) {
     doc.setFillColor(255,251,225); doc.setDrawColor(180,130,0); doc.rect(10,92,190,10,'FD');
     doc.setTextColor(80,50,0); doc.setFontSize(8); doc.setFont('helvetica','bold');
-    doc.text('Cond. de Pagamento: ',14,98.5);
-    doc.setFont('helvetica','normal'); doc.setTextColor(26,92,58);
-    doc.text(resp.condicaoPagamento.substring(0,70),14+doc.getTextWidth('Cond. de Pagamento: '),98.5);
+    const pts = [];
+    if (hasCond) pts.push('Pgto: '+resp.condicaoPagamento);
+    if (hasPrazo2) pts.push('Prazo: '+resp.prazoEntrega);
+    doc.text(pts.join('   |   ').substring(0,90), 14, 98.5);
   }
   doc.autoTable({startY:tableStartY,head:[['Codigo','Descricao','Qtd','Unid.','Preco Unit.','Total (R$)']],
     body:items.map(i=>{
@@ -2366,8 +2385,13 @@ function showSupplierPage(cot) {
             <input type="text" id="isf-razao" placeholder="Nome da empresa" style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
           <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:#4a7a4a;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Contato</label>
             <input type="text" id="isf-contato" placeholder="Nome / E-mail / Telefone (opcional)" style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
-          <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:#4a7a4a;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">💳 Condição de Pagamento</label>
-            <input type="text" id="isf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias... (opcional)" style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
+          <!-- Condição pagamento + prazo entrega lado a lado -->
+          <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;background:rgba(22,102,52,.07);border:1.5px solid rgba(22,102,52,.25);border-radius:10px;padding:14px 16px">
+            <div><label style="font-size:11px;font-weight:700;color:#166634;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">💳 Condição de Pagamento</label>
+              <input type="text" id="isf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias..." style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
+            <div><label style="font-size:11px;font-weight:700;color:#166634;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">🚚 Prazo de Entrega</label>
+              <input type="text" id="isf-prazo" placeholder="Ex: 5 dias úteis, Imediato, 10 dias..." style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
+          </div>
         </div>
       </div>
       <div style="background:#fff;border-radius:16px;padding:24px 28px;margin-bottom:20px;border:1px solid #d4e8d4;box-shadow:0 2px 12px rgba(0,0,0,.06)">
@@ -2419,6 +2443,8 @@ async function tryLoadPreviousAnswer(cotId) {
   document.getElementById('isf-contato').value = match.contato||'';
   const pagEl = document.getElementById('isf-pagamento');
   if (pagEl) pagEl.value = match.condicaoPagamento||'';
+  const prazoEl = document.getElementById('isf-prazo');
+  if (prazoEl) prazoEl.value = match.prazoEntrega||'';
 
   // Pré-preenche preços de cada item
   (match.prices||[]).forEach(p => {
@@ -2451,6 +2477,7 @@ async function submitInlineForm(cotId, items) {
   const cot = state.cotacoes.find(c => c.id===cotId);
   const contato = document.getElementById('isf-contato')?.value||'';
   const condicaoPagamento = document.getElementById('isf-pagamento')?.value||'';
+  const prazoEntrega = document.getElementById('isf-prazo')?.value||'';
   const prices = itemsList.map(item=>({
     itemId: item.itemId, code: item.code, name: item.name, unit: item.unit, qty: item.qty,
     price:     parseFloat(document.getElementById('isf-price-'   +item.itemId)?.value)||0,
@@ -2458,7 +2485,7 @@ async function submitInlineForm(cotId, items) {
     disponivel:document.getElementById('isf-disp-'    +item.itemId)?.value==='sim',
     comment:   document.getElementById('isf-comment-' +item.itemId)?.value||''
   }));
-  const payload = { cotacaoId:cotId, cotacaoTitle:cot?cot.title:'Cotação #'+cotId, cnpj, razaoSocial:razao, contato, condicaoPagamento, submittedAt:new Date().toISOString(), prices };
+  const payload = { cotacaoId:cotId, cotacaoTitle:cot?cot.title:'Cotação #'+cotId, cnpj, razaoSocial:razao, contato, condicaoPagamento, prazoEntrega, submittedAt:new Date().toISOString(), prices };
   const btn = document.getElementById('isf-submit-btn');
   if (btn) { btn.disabled=true; btn.textContent='Enviando...'; }
   const res = await apiCall('saveResposta', payload);
