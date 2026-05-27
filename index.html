@@ -621,20 +621,12 @@ canvas{max-width:100%}
       <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--green)">
         ⚠️ CNPJ e Razão Social são obrigatórios. Preencha os preços unitários dos itens disponíveis.
       </div>
-      <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-grid" style="margin-bottom:16px">
         <div class="form-group"><label>CNPJ *</label><input type="text" id="sf-cnpj" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)"></div>
         <div class="form-group"><label>Razão Social *</label><input type="text" id="sf-razao" placeholder="Nome da empresa"></div>
         <div class="form-group full"><label>Contato (Nome/E-mail/Telefone)</label><input type="text" id="sf-contato" placeholder="Opcional"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;background:rgba(34,197,94,.07);border:1.5px solid rgba(34,197,94,.3);border-radius:10px;padding:14px 16px">
-        <div class="form-group">
-          <label style="color:var(--green);font-weight:700">💳 Condição de Pagamento</label>
-          <input type="text" id="sf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias...">
-        </div>
-        <div class="form-group">
-          <label style="color:var(--green);font-weight:700">🚚 Prazo de Entrega</label>
-          <input type="text" id="sf-prazo" placeholder="Ex: 5 dias úteis, Imediato, 10 dias...">
-        </div>
+        <div class="form-group" style="border-left:3px solid var(--green);padding-left:10px"><label style="color:var(--green);font-weight:700">💳 Condição de Pagamento</label><input type="text" id="sf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias..."></div>
+        <div class="form-group" style="border-left:3px solid var(--green);padding-left:10px"><label style="color:var(--green);font-weight:700">🚚 Prazo de Entrega</label><input type="text" id="sf-prazo" placeholder="Ex: 5 dias úteis, Imediato, 10 dias..."></div>
       </div>
       <div id="sf-items-list"></div>
     </div>
@@ -2385,13 +2377,10 @@ function showSupplierPage(cot) {
             <input type="text" id="isf-razao" placeholder="Nome da empresa" style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
           <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:#4a7a4a;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Contato</label>
             <input type="text" id="isf-contato" placeholder="Nome / E-mail / Telefone (opcional)" style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
-          <!-- Condição pagamento + prazo entrega lado a lado -->
-          <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;background:rgba(22,102,52,.07);border:1.5px solid rgba(22,102,52,.25);border-radius:10px;padding:14px 16px">
-            <div><label style="font-size:11px;font-weight:700;color:#166634;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">💳 Condição de Pagamento</label>
-              <input type="text" id="isf-pagamento" placeholder="Ex: 30 dias, À vista, 30/60/90 dias..." style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
-            <div><label style="font-size:11px;font-weight:700;color:#166634;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">🚚 Prazo de Entrega</label>
-              <input type="text" id="isf-prazo" placeholder="Ex: 5 dias úteis, Imediato, 10 dias..." style="width:100%;padding:10px 14px;border:1.5px solid #c8e0c8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#fff;outline:none;font-family:Inter,sans-serif"></div>
-          </div>
+          <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:#166634;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">&#x1F4B3; Cond. de Pagamento</label>
+            <input type="text" id="isf-pagamento" placeholder="Ex: 30 dias, A vista, 30/60/90 dias..." style="width:100%;padding:10px 14px;border:1.5px solid #a8d8a8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#f0faf0;outline:none;font-family:Inter,sans-serif"></div>
+          <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:#166634;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">&#x1F69A; Prazo de Entrega</label>
+            <input type="text" id="isf-prazo" placeholder="Ex: 5 dias uteis, Imediato, 10 dias..." style="width:100%;padding:10px 14px;border:1.5px solid #a8d8a8;border-radius:8px;font-size:14px;color:#1a3a1a;background:#f0faf0;outline:none;font-family:Inter,sans-serif"></div>
         </div>
       </div>
       <div style="background:#fff;border-radius:16px;padding:24px 28px;margin-bottom:20px;border:1px solid #d4e8d4;box-shadow:0 2px 12px rgba(0,0,0,.06)">
