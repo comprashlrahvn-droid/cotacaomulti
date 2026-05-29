@@ -2136,10 +2136,12 @@ function autoGerarParecer() {
   if (!cot||!resps.length) return;
 
   const hoje = new Date().toLocaleDateString('pt-BR');
-  let t = `PARECER DO COMPRADOR\nCotação: ${cot.title} | Data: ${hoje}\n${'─'.repeat(60)}\n\n`;
+  const sep = '------------------------------------------------------------';
+  let t = `PARECER DO COMPRADOR\n`;
+  t += `Cotacao: ${cot.title} | Data: ${hoje}\n${sep}\n\n`;
 
   // Resumo por item
-  t += `📦 ANÁLISE POR ITEM (Menor Preço):\n`;
+  t += `ANALISE POR ITEM (Menor Preco):\n`;
   (cot.items||[]).forEach(item => {
     let min=null, minSupp='';
     resps.forEach(r=>{
@@ -2149,61 +2151,63 @@ function autoGerarParecer() {
         if(min===null||eff<min){min=eff;minSupp=r.razaoSocial;}
       }
     });
-    t += `• ${item.name}: melhor preço R$ ${min?min.toFixed(2).replace('.',','):'N/D'} — ${minSupp||'—'}\n`;
+    t += `  * ${item.name}: melhor preco R$ ${min?min.toFixed(2).replace('.',','):'N/D'} -- ${minSupp||'--'}\n`;
   });
 
   // Totais por OC
-  if (ordensMap) {
-    t += `\n🏆 PROPOSTA VENCEDORA POR FORNECEDOR (menor preço item a item):\n`;
+  if (ordensMap && Object.keys(ordensMap).length) {
+    t += `\nPROPOSTA VENCEDORA POR FORNECEDOR (menor preco item a item):\n`;
     Object.values(ordensMap).forEach(({resp,items})=>{
       const tot=items.reduce((s,i)=>s+i.total,0);
-      t += `• ${resp.razaoSocial}: R$ ${tot.toFixed(2).replace('.',',')} (${items.length} item(s))\n`;
+      t += `  * ${resp.razaoSocial}: R$ ${tot.toFixed(2).replace('.',',')} (${items.length} item(s))\n`;
     });
   }
 
   // Condições comerciais
   const comPgto = resps.filter(r=>r.condicaoPagamento&&r.condicaoPagamento.trim());
   const comPrazo = resps.filter(r=>r.prazoEntrega&&r.prazoEntrega.trim());
+
+  t += `\nCONDICOES DE PAGAMENTO:\n`;
   if (comPgto.length) {
-    t += `\n💳 CONDIÇÕES DE PAGAMENTO:\n`;
-    comPgto.forEach(r=>{ t += `• ${r.razaoSocial}: ${r.condicaoPagamento}\n`; });
+    comPgto.forEach(r=>{ t += `  * ${r.razaoSocial}: ${r.condicaoPagamento}\n`; });
   } else {
-    t += `\n💳 CONDIÇÕES DE PAGAMENTO: Não informadas pelos fornecedores.\n`;
-  }
-  if (comPrazo.length) {
-    t += `\n🚚 PRAZOS DE ENTREGA:\n`;
-    comPrazo.forEach(r=>{ t += `• ${r.razaoSocial}: ${r.prazoEntrega}\n`; });
-  } else {
-    t += `\n🚚 PRAZOS DE ENTREGA: Não informados pelos fornecedores.\n`;
+    t += `  Nao informadas pelos fornecedores.\n`;
   }
 
-  // Recomendação automática
-  t += `\n${'─'.repeat(60)}\n📋 RECOMENDAÇÃO:\n`;
+  t += `\nPRAZOS DE ENTREGA:\n`;
+  if (comPrazo.length) {
+    comPrazo.forEach(r=>{ t += `  * ${r.razaoSocial}: ${r.prazoEntrega}\n`; });
+  } else {
+    t += `  Nao informados pelos fornecedores.\n`;
+  }
+
+  // Recomendação
+  t += `\n${sep}\nRECOMENDACAO:\n`;
   if (ordensMap && Object.keys(ordensMap).length) {
     const winners = Object.values(ordensMap);
     if (winners.length === 1) {
       const w = winners[0];
       const tot = w.items.reduce((s,i)=>s+i.total,0);
-      t += `Recomenda-se a emissão de Ordem de Compra para ${w.resp.razaoSocial}`;
-      t += `, por apresentar o menor preço total de R$ ${tot.toFixed(2).replace('.',',')}`;
-      if (w.resp.condicaoPagamento) t += `, com condição de pagamento ${w.resp.condicaoPagamento}`;
+      t += `Recomenda-se a emissao de Ordem de Compra para ${w.resp.razaoSocial}`;
+      t += `, por apresentar o menor preco total de R$ ${tot.toFixed(2).replace('.',',')}`;
+      if (w.resp.condicaoPagamento) t += `, com condicao de pagamento ${w.resp.condicaoPagamento}`;
       if (w.resp.prazoEntrega) t += ` e prazo de entrega de ${w.resp.prazoEntrega}`;
       t += `.\n`;
     } else {
-      t += `A cotação foi dividida entre ${winners.length} fornecedores pelo critério de menor preço por item.\n`;
+      t += `A cotacao foi dividida entre ${winners.length} fornecedores pelo criterio de menor preco por item:\n`;
       winners.forEach(({resp,items})=>{
         const tot=items.reduce((s,i)=>s+i.total,0);
-        t += `• ${resp.razaoSocial} — R$ ${tot.toFixed(2).replace('.',',')}`;
+        t += `  * ${resp.razaoSocial} -- R$ ${tot.toFixed(2).replace('.',',')}`;
         if(resp.condicaoPagamento) t += ` | Pgto: ${resp.condicaoPagamento}`;
         if(resp.prazoEntrega) t += ` | Prazo: ${resp.prazoEntrega}`;
         t += `\n`;
       });
     }
   }
-  t += `\n[Complemente com observações relevantes sobre qualidade, histórico do fornecedor ou outros critérios]`;
+  t += `\n[Complemente com observacoes sobre qualidade, historico do fornecedor ou outros criterios]`;
 
   document.getElementById('parecer-comprador').value = t;
-  toast('Sugestão gerada! Edite conforme necessário.');
+  toast('Sugestao gerada! Edite conforme necessario.');
 }
 
 function downloadCompletoPDF() {
@@ -2234,15 +2238,16 @@ function downloadCompletoPDF() {
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
   let cx = 10, cy = 58;
   const condBoxW = Math.floor(270 / Math.min(resps.length, 4));
+  const sn = s => (s||'').replace(/[àáâãä]/g,'a').replace(/[ÀÁÂÃÄ]/g,'A').replace(/[èéêë]/g,'e').replace(/[ÈÉÊË]/g,'E').replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ÒÓÔÕÖ]/g,'O').replace(/[ùúûü]/g,'u').replace(/[ÙÚÛÜ]/g,'U').replace(/ç/g,'c').replace(/Ç/g,'C').replace(/[^\x20-\x7E]/g,'');
   resps.forEach((r, i) => {
     if (i > 0 && i % 4 === 0) { cx = 10; cy += 18; }
     doc.setFillColor(240,252,244); doc.rect(cx, cy-5, condBoxW-3, 16, 'F');
     doc.setDrawColor(26,92,58); doc.setLineWidth(0.3); doc.rect(cx, cy-5, condBoxW-3, 16);
     doc.setTextColor(26,92,58); doc.setFontSize(7); doc.setFont('helvetica','bold');
-    doc.text((r.razaoSocial||'').substring(0,condBoxW/2.2), cx+2, cy);
+    doc.text(sn(r.razaoSocial).substring(0, Math.floor(condBoxW/2.2)), cx+2, cy);
     doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(7);
-    doc.text('Pgto: '+(r.condicaoPagamento||'N/I').substring(0,condBoxW/2.1), cx+2, cy+5);
-    doc.text('Prazo: '+(r.prazoEntrega||'N/I').substring(0,condBoxW/2.3), cx+2, cy+10);
+    doc.text('Pgto: '+sn(r.condicaoPagamento||'N/I').substring(0, Math.floor(condBoxW/2.1)), cx+2, cy+5);
+    doc.text('Prazo: '+sn(r.prazoEntrega||'N/I').substring(0, Math.floor(condBoxW/2.3)), cx+2, cy+10);
     cx += condBoxW;
   });
 
@@ -2253,12 +2258,13 @@ function downloadCompletoPDF() {
   doc.text('Comparativo de Precos por Item',10, tableStartY - 2);
 
   const headerRow = ['Item','Qtd'];
-  resps.forEach(r => headerRow.push(r.razaoSocial.split(' ').slice(0,2).join(' ')));
-  headerRow.push('Menor','Maior','\u0394 Diferenca','Fornecedor Vencedor','Melhor Cond. Pgto');
+  const sanitN = s => (s||'').replace(/[àáâãä]/g,'a').replace(/[ÀÁÂÃÄ]/g,'A').replace(/[èéêë]/g,'e').replace(/[ÈÉÊË]/g,'E').replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ÒÓÔÕÖ]/g,'O').replace(/[ùúûü]/g,'u').replace(/[ÙÚÛÜ]/g,'U').replace(/ç/g,'c').replace(/Ç/g,'C').replace(/[^\x20-\x7E]/g,'');
+  resps.forEach(r => headerRow.push(sanitN(r.razaoSocial).split(' ').slice(0,2).join(' ')));
+  headerRow.push('Menor','Maior','Diferenca','Fornecedor Vencedor','Melhor Cond. Pgto');
 
   const bodyRows = (cot.items||[]).map(item => {
     const row = [item.name, item.qty+' '+item.unit];
-    let minPrice = null, maxPrice = null, bestSupp = '\u2014', bestCond = '\u2014';
+    let minPrice = null, maxPrice = null, bestSupp = '-', bestCond = '-';
     resps.forEach(r => {
       const p = (r.prices||[]).find(p => p.itemId===item.itemId);
       if (p && !p.desqualificado && p.disponivel && p.price > 0) {
@@ -2266,14 +2272,14 @@ function downloadCompletoPDF() {
         row.push('R$ '+eff.toFixed(2).replace('.',','));
         if (minPrice === null || eff < minPrice) {
           minPrice = eff;
-          bestSupp = r.razaoSocial.split(' ').slice(0,2).join(' ');
-          bestCond = r.condicaoPagamento || '\u2014';
+          bestSupp = sanitN(r.razaoSocial).split(' ').slice(0,2).join(' ');
+          bestCond = sanitN(r.condicaoPagamento) || '-';
         }
         if (maxPrice === null || eff > maxPrice) maxPrice = eff;
       } else { row.push('N/D'); }
     });
     const diffVal = (minPrice !== null && maxPrice !== null && maxPrice > minPrice)
-      ? 'R$ '+(maxPrice - minPrice).toFixed(2).replace('.',',') : '\u2014';
+      ? 'R$ '+(maxPrice - minPrice).toFixed(2).replace('.',',') : '-';
     row.push(
       minPrice !== null ? 'R$ '+minPrice.toFixed(2).replace('.',',') : 'N/D',
       maxPrice !== null ? 'R$ '+maxPrice.toFixed(2).replace('.',',') : 'N/D',
@@ -2284,19 +2290,34 @@ function downloadCompletoPDF() {
 
   // Calcular larguras de colunas dinamicamente
   const pageW = 277; // 297 - 20 margens
-  const fixedCols = 18 + 24 + 24 + 24 + 44 + 34; // qty+menor+maior+diff+vencedor+cond = 168
-  const itemColW = 50;
-  const suppAvail = pageW - itemColW - fixedCols;
-  const suppColW = resps.length > 0 ? Math.max(18, Math.floor(suppAvail / resps.length)) : 28;
+  const fixedCols = 14 + 22 + 22 + 20 + 40 + 28; // qty+menor+maior+diff+vencedor+cond = 146
+  const itemColW = 52;
+  const suppAvail = pageW - itemColW - fixedCols; // 277-52-146 = 79
+  const suppColW = resps.length > 0 ? Math.max(24, Math.floor(suppAvail / resps.length)) : 28;
 
-  const colStyles = {0:{cellWidth:itemColW}, 1:{cellWidth:18,halign:'center'}};
-  resps.forEach((_,i) => { colStyles[2+i] = {cellWidth:suppColW, halign:'right'}; });
+  const colStyles = {0:{cellWidth:itemColW}, 1:{cellWidth:14,halign:'center'}};
+  resps.forEach((_,i) => { colStyles[2+i] = {cellWidth:suppColW, halign:'right', overflow:'linebreak'}; });
   const n = resps.length;
-  colStyles[2+n] = {cellWidth:24, halign:'right', fontStyle:'bold', textColor:[22,163,74]};
-  colStyles[3+n] = {cellWidth:24, halign:'right'};
-  colStyles[4+n] = {cellWidth:24, halign:'right', fontStyle:'bold', textColor:[200,16,46]};
-  colStyles[5+n] = {cellWidth:44};
-  colStyles[6+n] = {cellWidth:34, textColor:[40,80,200]};
+  colStyles[2+n] = {cellWidth:22, halign:'right', fontStyle:'bold', textColor:[22,163,74]};
+  colStyles[3+n] = {cellWidth:22, halign:'right'};
+  colStyles[4+n] = {cellWidth:20, halign:'right', fontStyle:'bold', textColor:[200,16,46]};
+  colStyles[5+n] = {cellWidth:40};
+  colStyles[6+n] = {cellWidth:28};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   doc.autoTable({
     startY: tableStartY + 3,
@@ -2314,17 +2335,18 @@ function downloadCompletoPDF() {
   const condY = doc.lastAutoTable.finalY + 10;
   doc.setTextColor(26,92,58); doc.setFontSize(11); doc.setFont('helvetica','bold');
   doc.text('Condicoes Comerciais Detalhadas por Fornecedor', 10, condY);
+  const sanit = s => (s||'').replace(/[àáâãä]/g,'a').replace(/[ÀÁÂÃÄ]/g,'A').replace(/[èéêë]/g,'e').replace(/[ÈÉÊË]/g,'E').replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ÒÓÔÕÖ]/g,'O').replace(/[ùúûü]/g,'u').replace(/[ÙÚÛÜ]/g,'U').replace(/ç/g,'c').replace(/Ç/g,'C').replace(/[—–]/g,'-').replace(/[^\x20-\x7E]/g,'');
   doc.autoTable({
     startY: condY + 4,
     head: [['Fornecedor','CNPJ','Cond. Pagamento','Prazo Entrega','Total Proposta']],
     body: resps.map(r => {
       const tot = (r.prices||[]).reduce((s,p)=>s+(p.disponivel&&!p.desqualificado&&p.price>0?p.price*p.qty:0),0);
       return [
-        r.razaoSocial,
+        sanit(r.razaoSocial),
         r.cnpj,
-        r.condicaoPagamento || 'Nao informado',
-        r.prazoEntrega || 'Nao informado',
-        tot > 0 ? 'R$ '+tot.toFixed(2).replace('.',',') : '—'
+        sanit(r.condicaoPagamento) || 'Nao informado',
+        sanit(r.prazoEntrega) || 'Nao informado',
+        tot > 0 ? 'R$ '+tot.toFixed(2).replace('.',',') : '-'
       ];
     }),
     headStyles: {fillColor:[26,92,58], textColor:255, fontStyle:'bold', fontSize:8},
@@ -2337,19 +2359,35 @@ function downloadCompletoPDF() {
   });
 
   // ── PARECER DO COMPRADOR ──
-  const parecer = (state.pareceres && state.pareceres[cotId]) ? state.pareceres[cotId].trim() : '';
-  if (parecer) {
-    let pY = doc.lastAutoTable.finalY + 10;
-    // Nova página se não couber
-    if (pY > 170) { doc.addPage('a4','landscape'); pY = 20; }
-    doc.setFillColor(255,253,235); doc.setDrawColor(180,130,0); doc.rect(10, pY, 277, 8, 'FD');
-    doc.setTextColor(80,50,0); doc.setFontSize(10); doc.setFont('helvetica','bold');
-    doc.text('PARECER DO COMPRADOR', 14, pY + 5.5);
+  const parecerRaw = (state.pareceres && state.pareceres[cotId]) ? state.pareceres[cotId].trim() : '';
+  if (parecerRaw) {
+    // Sanitizar para jsPDF (substituir caracteres especiais)
+    const parecer = parecerRaw
+      .replace(/[àáâãä]/g,'a').replace(/[ÀÁÂÃÄ]/g,'A')
+      .replace(/[èéêë]/g,'e').replace(/[ÈÉÊË]/g,'E')
+      .replace(/[ìíîï]/g,'i').replace(/[ÌÍÎÏ]/g,'I')
+      .replace(/[òóôõö]/g,'o').replace(/[ÒÓÔÕÖ]/g,'O')
+      .replace(/[ùúûü]/g,'u').replace(/[ÙÚÛÜ]/g,'U')
+      .replace(/[ýÿ]/g,'y').replace(/ç/g,'c').replace(/Ç/g,'C')
+      .replace(/ñ/g,'n').replace(/Ñ/g,'N')
+      .replace(/[—–]/g,'-').replace(/[""]/g,'"').replace(/['']/g,"'")
+      .replace(/[^\x20-\x7E\n\r]/g,'');
+
+    let pY = doc.lastAutoTable.finalY + 12;
+    if (pY > 172) { doc.addPage('a4','landscape'); pY = 20; }
+
+    // Cabeçalho do bloco
+    doc.setFillColor(255,251,220); doc.setDrawColor(180,140,0);
+    doc.rect(10, pY, 277, 9, 'FD');
+    doc.setTextColor(60,40,0); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('PARECER DO COMPRADOR', 14, pY + 6);
+
+    // Corpo do parecer
     doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
+    let ly = pY + 16;
     const linhas = doc.splitTextToSize(parecer, 270);
-    let ly = pY + 14;
     linhas.forEach(linha => {
-      if (ly > 192) { doc.addPage('a4','landscape'); ly = 20; }
+      if (ly > 195) { doc.addPage('a4','landscape'); ly = 20; }
       doc.text(linha, 14, ly);
       ly += 5;
     });
