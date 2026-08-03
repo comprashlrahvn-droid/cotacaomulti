@@ -2289,14 +2289,14 @@ function downloadCompletoPDF() {
   });
 
   // Calcular larguras de colunas dinamicamente
-  const pageW = 277; // 297 - 20 margens
-  const fixedCols = 14 + 22 + 22 + 20 + 40 + 28; // qty+menor+maior+diff+vencedor+cond = 146
   const itemColW = 52;
-  const suppAvail = pageW - itemColW - fixedCols; // 277-52-146 = 79
-  const suppColW = resps.length > 0 ? Math.max(24, Math.floor(suppAvail / resps.length)) : 28;
-
   const colStyles = {0:{cellWidth:itemColW}, 1:{cellWidth:14,halign:'center'}};
-  resps.forEach((_,i) => { colStyles[2+i] = {cellWidth:suppColW, halign:'right', overflow:'linebreak'}; });
+  // Colunas dos fornecedores usam largura 'auto': o autoTable divide o espaço
+  // restante entre elas e encolhe proporcionalmente se não couber na página.
+  // (Antes havia um mínimo fixo de 24mm por fornecedor, que com 5+ fornecedores
+  // ultrapassava a largura da página e fazia as últimas colunas — Vencedor,
+  // Melhor Cond. Pgto — ficarem cortadas fora da folha.)
+  resps.forEach((_,i) => { colStyles[2+i] = {cellWidth:'auto', halign:'right', overflow:'linebreak'}; });
   const n = resps.length;
   colStyles[2+n] = {cellWidth:22, halign:'right', fontStyle:'bold', textColor:[22,163,74]};
   colStyles[3+n] = {cellWidth:22, halign:'right'};
@@ -2319,16 +2319,18 @@ function downloadCompletoPDF() {
 
 
 
+  const compTableFontSize = resps.length > 6 ? 5.5 : 6.5;
   doc.autoTable({
     startY: tableStartY + 3,
     head: [headerRow],
     body: bodyRows,
-    headStyles: {fillColor:[26,92,58], textColor:255, fontStyle:'bold', fontSize:6.5, cellPadding:2},
-    bodyStyles: {fontSize:6.5, cellPadding:2, overflow:'linebreak'},
+    headStyles: {fillColor:[26,92,58], textColor:255, fontStyle:'bold', fontSize:compTableFontSize, cellPadding:1.5},
+    bodyStyles: {fontSize:compTableFontSize, cellPadding:1.5, overflow:'linebreak'},
     alternateRowStyles: {fillColor:[240,250,244]},
     columnStyles: colStyles,
     margin: {left:10, right:10},
-    styles: {overflow:'linebreak'}
+    styles: {overflow:'linebreak'},
+    tableWidth: 277
   });
 
   // ── TABELA DE CONDIÇÕES COMERCIAIS ──
